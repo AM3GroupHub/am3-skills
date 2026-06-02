@@ -1,0 +1,4 @@
+interface:
+  display_name: "Practice Talk Review"
+  short_description: "Transcribe and critique rehearsal talks"
+  default_prompt: "Use $practice-talk-review to transcribe this rehearsal recording and give candid academic presentation feedback."
