@@ -1,21 +1,24 @@
 # Practice-Talk Review — <Talk title or filename>
 
-> Recording: `<input filename>` · Duration ~<MM:SS> · ~<N> words · ~<rate> words/min
+> Source: `<input filename>` · Duration ~<MM:SS> · ~<N> words · ~<rate> words/min
 > Target slot: <e.g. 12.5 min> · Transcribed with <backend/model> · Reviewed against the group rubric.
-> Audio-only review — judges spoken logic, flow, pacing, and how results are explained; it does not see your slides.
+> Spoken-talk review — for audio/video input, this is generated from local transcription; for transcript input, timing depends on available timestamps. It judges spoken logic, flow, pacing, and how results are explained; it does not see your slides unless supplied.
 
 **Overall verdict:** <one or two honest sentences — the headline strength and the headline gap>.
 
 **Timing check:** <spoken length vs. target; speaking rate vs. ~140–160 wpm; note rush/drag>.
 
+## What already works
+- <2–4 strengths to preserve: clear problem framing, motivated method sequence, mature result comparison, strong conclusion, or confident delivery. For a strong talk, make this section specific and substantial.>
+
 ---
 
 ## 1. Logic gaps & structural problems
-> The highest-impact section — fix these first.
+> The highest-impact section. For a mature talk, say "no major structural gap" if true and use this section for polish only.
 
 ### <conclusive, imperative finding title>
 - **Heard:** *"<short verbatim quote>"* (~MM:SS)
-- **Problem:** <what's missing / out of order / never lands>
+- **Problem / polish opportunity:** <what's missing / out of order / never lands, or what can be trimmed/moved to backup>
 - **Fix:** <the concrete change>
 - **Principle:** <transferable takeaway> · *`[logic: <tag>]`*
 
@@ -23,7 +26,7 @@
 
 ### <finding title>
 - **Heard:** *"<quote>"* (~MM:SS)  ·  <or: "filler clustered at 03:10–03:40 (um ×7)">
-- **Problem:** <choppy transition / filler / run-on / pacing>
+- **Problem / polish opportunity:** <choppy transition / filler / run-on / pacing / over-explained implementation detail>
 - **Fix:** <concrete change>
 - **Principle:** <takeaway> · *`[flow: <tag>]`*
 
@@ -31,13 +34,18 @@
 
 ### <finding title>
 - **Heard:** *"<quote>"* (~MM:SS)
-- **Problem:** <data undefined before conclusion / overclaim / no "so what" / raced through>
+- **Problem / polish opportunity:** <data undefined before conclusion / overclaim / no "so what" / raced through / caveat phrased too speculatively>
 - **Fix:** <concrete change>
 - **Principle:** <takeaway> · *`[results: <tag>]`*
 
 ## Delivery & wording (quick hits)
 - <bullet: filler-word count and worst clusters; reading vs. internalized; jargon defined?; precise-term swaps like "high accuracy" not "chemical accuracy">
-- <bullet: title read aloud? ran over time? audible under-rehearsal?>
+- <bullet: title read aloud? ran over time? acknowledgements too long? side material better as backup?>
+
+## Group-feedback signals
+> Include only when the transcript contains post-talk discussion. Do not count this discussion in talk timing or filler statistics.
+
+- <reviewer signal: "already a mature talk", "cut this explanation", "move this to backup", etc.> → <transferable lesson and matching rubric tag>
 
 ## Sentence-level repair list
 > Include this for audio/video input, or when the user asks for sentence-level coaching. Pick the highest-impact broken or weak sentences; do not paste the whole transcript unless requested.
