@@ -15,7 +15,9 @@ from typing import Iterable
 TIME_RE = re.compile(
     r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2})[,.](?P<ms>\d{3})"
 )
-INLINE_STAMP_RE = re.compile(r"^(?P<stamp>\d{2}:\d{2}:\d{2})\s+Speaker\s+\d+\s*$")
+INLINE_STAMP_RE = re.compile(
+    r"^(?P<stamp>\d{2}:\d{2}:\d{2})\s+(?P<speaker>Speaker\s+\d+)\s*$"
+)
 WORD_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9'/_+-]*")
 FILLER_PATTERNS = [
     r"\bum+\b",
@@ -53,6 +55,7 @@ class Cue:
     start: float
     end: float
     text: str
+    speaker: str | None = None
 
 
 def parse_time(value: str) -> float:
@@ -71,6 +74,18 @@ def parse_time(value: str) -> float:
 def parse_clock(value: str) -> float:
     hours, minutes, seconds = [int(part) for part in value.split(":")]
     return hours * 3600 + minutes * 60 + seconds
+
+
+def parse_time_arg(value: str) -> float:
+    parts = value.split(":")
+    if len(parts) == 1:
+        return float(value)
+    if len(parts) == 2:
+        minutes, seconds = [int(part) for part in parts]
+        return minutes * 60 + seconds
+    if len(parts) == 3:
+        return parse_clock(value)
+    raise ValueError(f"bad time value: {value}")
 
 
 def fmt_time(seconds: float | None) -> str:
@@ -112,25 +127,74 @@ def parse_srt(path: Path) -> list[Cue]:
 def parse_inline_timestamp_transcript(text: str) -> list[Cue]:
     cues: list[Cue] = []
     current_start: float | None = None
+    current_speaker: str | None = None
     current_lines: list[str] = []
     for raw_line in text.splitlines():
         line = raw_line.strip()
         match = INLINE_STAMP_RE.match(line)
         if match:
             if current_start is not None and current_lines:
-                cues.append(Cue(current_start, current_start, clean_text(" ".join(current_lines))))
+                cues.append(
+                    Cue(
+                        current_start,
+                        current_start,
+                        clean_text(" ".join(current_lines)),
+                        current_speaker,
+                    )
+                )
             current_start = parse_clock(match.group("stamp"))
+            current_speaker = match.group("speaker")
             current_lines = []
             continue
         if line:
             current_lines.append(line)
     if current_start is not None and current_lines:
-        cues.append(Cue(current_start, current_start, clean_text(" ".join(current_lines))))
+        cues.append(
+            Cue(
+                current_start,
+                current_start,
+                clean_text(" ".join(current_lines)),
+                current_speaker,
+            )
+        )
     for index, cue in enumerate(cues[:-1]):
         cue.end = cues[index + 1].start
     if cues:
         cues[-1].end = cues[-1].start
     return cues
+
+
+def normalize_speaker(value: str) -> str:
+    value = value.strip()
+    if value.isdigit():
+        value = f"Speaker {value}"
+    return re.sub(r"\s+", " ", value).lower()
+
+
+def filter_cues(
+    cues: list[Cue],
+    speaker: str | None = None,
+    start: float | None = None,
+    until: float | None = None,
+) -> list[Cue]:
+    speaker_key = normalize_speaker(speaker) if speaker else None
+    selected: list[Cue] = []
+    for cue in cues:
+        if speaker_key and normalize_speaker(cue.speaker or "") != speaker_key:
+            continue
+        if start is not None and cue.end <= start:
+            continue
+        if until is not None and cue.start >= until:
+            continue
+        selected.append(
+            Cue(
+                max(cue.start, start) if start is not None else cue.start,
+                min(cue.end, until) if until is not None else cue.end,
+                cue.text,
+                cue.speaker,
+            )
+        )
+    return selected
 
 
 def sentence_split(text: str) -> list[str]:
@@ -246,6 +310,16 @@ def markdown_escape(value: str) -> str:
     return value.replace("|", "\\|").replace("\n", " ")
 
 
+def format_selection(selection: object) -> str:
+    if not isinstance(selection, dict):
+        return str(selection)
+    return "{speaker}, {start} to {until}".format(
+        speaker=selection.get("speaker", "all"),
+        start=selection.get("start", "beginning"),
+        until=selection.get("until", "end"),
+    )
+
+
 def write_markdown(
     out: Path,
     transcript: Path,
@@ -260,6 +334,7 @@ def write_markdown(
         f"- Word count: {summary['word_count']}",
         f"- Speaking rate: {summary['words_per_minute']} words/min",
         f"- Target slot: {summary['target_minutes']}",
+        f"- Selection: {format_selection(summary['selection'])}",
         f"- Filler count: {summary['filler_count']}",
         "",
         "## Sentence Candidates",
@@ -290,6 +365,18 @@ def main() -> int:
     parser.add_argument("--srt", type=Path)
     parser.add_argument("--media", type=Path)
     parser.add_argument("--target-minutes", type=float)
+    parser.add_argument(
+        "--speaker",
+        help='Restrict inline timestamp transcripts to one speaker, e.g. "Speaker 1" or "1".',
+    )
+    parser.add_argument(
+        "--start",
+        help="Only include cues after this time. Accepts seconds, MM:SS, or HH:MM:SS.",
+    )
+    parser.add_argument(
+        "--until",
+        help="Only include cues before this time. Accepts seconds, MM:SS, or HH:MM:SS.",
+    )
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
 
@@ -297,14 +384,24 @@ def main() -> int:
     cues = parse_srt(args.srt) if args.srt and args.srt.exists() else []
     if not cues:
         cues = parse_inline_timestamp_transcript(text)
-    duration_seconds = cues[-1].end if cues else None
+    start = parse_time_arg(args.start) if args.start else None
+    until = parse_time_arg(args.until) if args.until else None
+    if cues and (args.speaker or start is not None or until is not None):
+        cues = filter_cues(cues, args.speaker, start, until)
+    elif args.speaker or start is not None or until is not None:
+        parser.error("--speaker/--start/--until require an SRT or inline timestamp transcript")
+    if not cues and (args.speaker or start is not None or until is not None):
+        parser.error("selection matched no transcript cues")
+
+    analysis_text = clean_text(" ".join(cue.text for cue in cues)) if cues else text
+    duration_seconds = sum(max(0, cue.end - cue.start) for cue in cues) if cues else None
     if duration_seconds is None and args.media:
         duration_seconds = ffprobe_duration(args.media)
 
     if cues:
         rows = sentences_from_cues(cues)
     else:
-        rows = sentence_rows(text, None, None)
+        rows = sentence_rows(analysis_text, None, None)
 
     candidates: list[dict[str, object]] = []
     for row in rows:
@@ -323,7 +420,7 @@ def main() -> int:
             )
     candidates.sort(key=lambda item: (-int(item["score"]), -int(item["word_count"])))
 
-    word_count = len(WORD_RE.findall(text))
+    word_count = len(WORD_RE.findall(analysis_text))
     minutes = duration_seconds / 60 if duration_seconds else None
     words_per_minute = round(word_count / minutes, 1) if minutes else "n/a"
     summary = {
@@ -333,7 +430,12 @@ def main() -> int:
         "word_count": word_count,
         "words_per_minute": words_per_minute,
         "target_minutes": args.target_minutes if args.target_minutes else "n/a",
-        "filler_count": count_pattern(FILLER_PATTERNS, text),
+        "selection": {
+            "speaker": args.speaker or "all",
+            "start": fmt_time(start) if start is not None else "beginning",
+            "until": fmt_time(until) if until is not None else "end",
+        },
+        "filler_count": count_pattern(FILLER_PATTERNS, analysis_text),
         "sentence_candidate_count": len(candidates),
     }
 
